@@ -11,11 +11,16 @@ class Ability
       can :create, User
 
       can [:index, :show, :create], Project
-      can [:update, :destroy], Project, user_id: user.id
+      can [:update, :destroy],      Project, user_id: user.id
+
+      can [:index, :show, :create], Ticket
+      can :create,                  Ticket, project: { status: 'open' }
+      can [:update, :destroy],      Ticket, user_id: user.id
     else
       can :create, User
       
       can [:index, :show], Project
+      can [:index, :show], Ticket
     end
   end
 end

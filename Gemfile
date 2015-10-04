@@ -14,6 +14,7 @@ group :development, :test do
 end
 
 gem 'bcrypt', '~> 3.1.7'
+gem 'rack-cors', :require => 'rack/cors'
 
 # Use unicorn as the app server
 # gem 'unicorn'
