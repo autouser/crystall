@@ -59,7 +59,7 @@ RSpec.describe "Users", type: :request do
       end
 
       it "returns 401 error if user doesn't exist" do
-        get api_v1_user_path(9999), nil, @headers
+        get api_v1_user_path(9999), nil, @admin_headers
         expect( response ).to                   have_http_status(401)
       end
 
