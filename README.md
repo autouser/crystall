@@ -2,7 +2,7 @@ Crystall is a simple Project/Ticket REST API.
 
 ## Instalation
 
-Fork it if you wish, clone it from Github, enter the directory. Then execute in a shell the commands below.
+Fork it if you wish, clone it from Github, enter the directory. Then execute commands below in a shell.
 
 ```
 bundle
@@ -22,7 +22,7 @@ There are three types of users:
 
 * **admin** - can create, read, update and delete everething in the system.
 * **user** - can create a new user, project or ticket; can read any project or ticket ; can read and destroy his registration only.
-* **guest** - can create a new user; can can read any project or ticket; don't need an authentication.
+* **guest** - can create a new user; can read any project or ticket; don't need an authentication.
 
 You can access *users* resources:
 
