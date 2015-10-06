@@ -3,6 +3,8 @@ require 'rails_helper'
 RSpec.describe "Users", type: :request do
 
   before(:each) do
+    Kaminari.config.default_per_page = 5
+
     @admin = User.create! username: 'admin', password: 'test1234', admin: true
     @user1 = User.create! username: 'john', password: 'test1234'
     @user2 = User.create! username: 'kate', password: 'test1234'
@@ -24,6 +26,20 @@ RSpec.describe "Users", type: :request do
         expect( response ).to             have_http_status(200)
         expect( json['status']).to        eq('success')
         expect( json['users'].size).to    eq(3)
+        expect( json['page']).to          eq(1)
+        expect( json['total_pages']).to   eq(1)
+      end
+
+      it "returns only 4 users if total_users_count = 9, per_page = 5, page = 2", focus: false do
+        (1 .. 6).each {|n| User.create! username: "user#{n}", password: 'test1234'}
+
+        get api_v1_users_path, {page: 2}, @admin_headers
+        expect( response ).to             have_http_status(200)
+
+        expect( json['status']).to        eq('success')
+        expect( json['users'].size).to    eq(4)
+        expect( json['page']).to          eq(2)
+        expect( json['total_pages']).to   eq(2)
       end
 
     end

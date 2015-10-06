@@ -2,6 +2,10 @@ class Api::V1::UsersController < Api::V1::BaseController
 
   load_and_authorize_resource :user
 
+  def index
+    @users = @users.page(params[:page])
+  end
+
   def create
     render status: 400 unless @user.save
   end
