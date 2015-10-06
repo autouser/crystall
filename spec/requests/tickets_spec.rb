@@ -3,6 +3,8 @@ require 'rails_helper'
 RSpec.describe "Tickets", type: :request do
 
   before(:each) do
+    Kaminari.config.default_per_page = 5
+
     @admin = User.create! username: 'admin', password: 'test1234', admin: true
     @user = User.create! username: 'john', password: 'test1234'
 
@@ -35,7 +37,9 @@ RSpec.describe "Tickets", type: :request do
     def expect_successfull_response
       expect( response ).to               have_http_status(200)
       expect( json['status']).to          eq('success')
-      expect( json['tickets'].size).to   eq(2)
+      expect( json['tickets'].size).to    eq(2)
+      expect( json['page']).to            eq(1)
+      expect( json['total_pages']).to     eq(1)
     end
 
     context "for admin" do
@@ -43,6 +47,19 @@ RSpec.describe "Tickets", type: :request do
         get api_v1_project_tickets_path(@admin_project), nil, @admin_headers
         expect_successfull_response
       end
+
+      it "returns only 4 tickets if total_tickets_count = 9, per_page = 5, page = 2", focus: false do
+        (1 .. 7).each {|n| @admin_project.tickets.create! user: @admin, content: "ticket#{n}", status: 'open'}
+
+        get api_v1_project_tickets_path(@admin_project), {page: 2}, @admin_headers
+      expect( response ).to               have_http_status(200)
+      expect( json['status']).to          eq('success')
+      expect( json['tickets'].size).to    eq(4)
+      expect( json['page']).to            eq(2)
+      expect( json['total_pages']).to     eq(2)
+      end
+
+
     end
 
     context "for user" do

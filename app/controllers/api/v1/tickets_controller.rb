@@ -4,7 +4,7 @@ class Api::V1::TicketsController < Api::V1::BaseController
   load_and_authorize_resource :ticket, :through => :project
 
   def index
-    @tickets = @tickets.includes(:user).includes(:project)
+    @tickets = @tickets.includes(:user).includes(:project).page(params[:page])
   end
 
   def create

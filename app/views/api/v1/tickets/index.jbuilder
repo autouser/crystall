@@ -12,3 +12,5 @@ json.tickets @tickets do |ticket|
   json.content      ticket.content
   json.status       ticket.status
 end
+json.page @tickets.current_page
+json.total_pages @tickets.total_pages

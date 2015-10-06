@@ -50,11 +50,11 @@ RSpec.describe "Projects", type: :request do
         (1 .. 7).each {|n| Project.create! user: @admin, name: "project#{n}", status: 'open'}
 
         get api_v1_projects_path, {page: 2}, @admin_headers
-      expect( response ).to               have_http_status(200)
-      expect( json['status']).to          eq('success')
-      expect( json['projects'].size).to   eq(4)
-      expect( json['page']).to            eq(2)
-      expect( json['total_pages']).to     eq(2)
+        expect( response ).to               have_http_status(200)
+        expect( json['status']).to          eq('success')
+        expect( json['projects'].size).to   eq(4)
+        expect( json['page']).to            eq(2)
+        expect( json['total_pages']).to     eq(2)
       end
 
     end
