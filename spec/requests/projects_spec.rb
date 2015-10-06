@@ -3,6 +3,9 @@ require 'rails_helper'
 RSpec.describe "Projects", type: :request do
 
   before(:each) do
+
+    Kaminari.config.default_per_page = 5
+
     @admin = User.create! username: 'admin', password: 'test1234', admin: true
     @user = User.create! username: 'john', password: 'test1234'
 
@@ -23,6 +26,7 @@ RSpec.describe "Projects", type: :request do
     expect( json['status']).to                      eq('failed')
     expect( json['project']['errors'].keys.count ).to  eq(1)
     expect( json['project']['errors'][field] ).to match_array([error])
+
   end
 
   describe "GET /api/projects", focus: false do
@@ -31,6 +35,8 @@ RSpec.describe "Projects", type: :request do
       expect( response ).to               have_http_status(200)
       expect( json['status']).to          eq('success')
       expect( json['projects'].size).to   eq(2)
+      expect( json['page']).to            eq(1)
+      expect( json['total_pages']).to     eq(1)
     end
 
     context "for admin" do
@@ -38,6 +44,17 @@ RSpec.describe "Projects", type: :request do
       it "returns a list of projects" do
         get api_v1_projects_path, nil, @admin_headers
         expect_successfull_response
+      end
+
+      it "returns only 4 projects if total_projects_count = 9, per_page = 5, page = 2", focus: false do
+        (1 .. 7).each {|n| Project.create! user: @admin, name: "project#{n}", status: 'open'}
+
+        get api_v1_projects_path, {page: 2}, @admin_headers
+      expect( response ).to               have_http_status(200)
+      expect( json['status']).to          eq('success')
+      expect( json['projects'].size).to   eq(4)
+      expect( json['page']).to            eq(2)
+      expect( json['total_pages']).to     eq(2)
       end
 
     end

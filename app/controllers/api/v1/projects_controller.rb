@@ -3,7 +3,7 @@ class Api::V1::ProjectsController < Api::V1::BaseController
   load_and_authorize_resource :project
 
   def index
-    @projects = @projects.includes(:user)
+    @projects = @projects.includes(:user).page(params[:page])
   end
 
   def create
