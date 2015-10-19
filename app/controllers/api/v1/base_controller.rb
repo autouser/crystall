@@ -40,10 +40,4 @@ private
     render text: 'param is missing or the value is empty', status: 400
   end
 
-  def fix_params
-    domain = controller_name.singularize.to_sym
-    params[domain] &&= send("#{domain}_params")
-  end
-
-
 end
