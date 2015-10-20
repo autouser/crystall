@@ -13,6 +13,11 @@ RSpec.describe "Projects", type: :request do
     { 'HTTP_AUTHORIZATION' => ActionController::HttpAuthentication::Basic.encode_credentials('john', 'test1234') }
   }
 
+  # let(:admin_project) { create :project, user: admin }
+  # let(:user_project)  { create :project, user: user  }
+
+
+
   before(:each) do
 
     Kaminari.config.default_per_page = 5
