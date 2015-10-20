@@ -5,19 +5,17 @@ RSpec.describe "Projects", type: :request do
   let(:admin) { create :admin }
   let(:user)  { create :user }
 
+  let(:admin_headers) {
+    { 'HTTP_AUTHORIZATION' => ActionController::HttpAuthentication::Basic.encode_credentials('admin', 'test1234') }
+  }
+
+  let(:user_headers) {
+    { 'HTTP_AUTHORIZATION' => ActionController::HttpAuthentication::Basic.encode_credentials('john', 'test1234') }
+  }
+
   before(:each) do
 
     Kaminari.config.default_per_page = 5
-
-    # @admin = User.create! username: 'admin', password: 'test1234', admin: true
-    # @user = User.create! username: 'john', password: 'test1234'
-
-    @admin_headers = {'HTTP_AUTHORIZATION' => ActionController::HttpAuthentication::Basic.encode_credentials(
-      'admin', 'test1234'
-    )}
-    @user_headers = {'HTTP_AUTHORIZATION' => ActionController::HttpAuthentication::Basic.encode_credentials(
-      'john', 'test1234'
-    )}
 
     @admin_project = admin.projects.create!  name: 'Core 1.0', description: 'Core System', status: 'open'
     @user_project  = user.projects.create!   name: 'Core 2.0', description: 'Core System (development)', status: 'closed'
@@ -45,14 +43,14 @@ RSpec.describe "Projects", type: :request do
     context "for admin", focus: true do
 
       it "returns a list of projects" do
-        get api_v1_projects_path, nil, @admin_headers
+        get api_v1_projects_path, nil, admin_headers
         expect_successfull_response
       end
 
       it "returns only 4 projects if total_projects_count = 9, per_page = 5, page = 2" do
         (1 .. 7).each {|n| Project.create! user: admin, name: "project#{n}", status: 'open'}
 
-        get api_v1_projects_path, {page: 2}, @admin_headers
+        get api_v1_projects_path, {page: 2}, admin_headers
         expect( response ).to               have_http_status(200)
         expect( json['status']).to          eq('success')
         expect( json['projects'].size).to   eq(4)
@@ -65,7 +63,7 @@ RSpec.describe "Projects", type: :request do
     context "for user" do
 
       it "returns a list of projects" do
-        get api_v1_projects_path, nil, @user_headers
+        get api_v1_projects_path, nil, user_headers
         expect_successfull_response
       end      
 
@@ -96,12 +94,12 @@ RSpec.describe "Projects", type: :request do
     context "for admin" do
 
       it "returns a specific project" do
-        get api_v1_project_path(@admin_project), nil, @admin_headers
+        get api_v1_project_path(@admin_project), nil, admin_headers
         expect_successfull_response
       end
 
       it "returns 401 error if project doesn't exist" do
-        get api_v1_user_path(9999), nil, @admin_headers
+        get api_v1_user_path(9999), nil, admin_headers
         expect( response ).to have_http_status(401)
       end
 
@@ -110,12 +108,12 @@ RSpec.describe "Projects", type: :request do
     context "for user" do
 
       it "returns a specific project" do
-        get api_v1_project_path(@admin_project), nil, @user_headers
+        get api_v1_project_path(@admin_project), nil, user_headers
         expect_successfull_response
       end
 
       it "returns 401 error if project doesn't exist" do
-        get api_v1_user_path(9999), nil, @user_headers
+        get api_v1_user_path(9999), nil, user_headers
         expect( response ).to have_http_status(401)
       end
 
@@ -158,7 +156,7 @@ RSpec.describe "Projects", type: :request do
             description: 'Core (planed)',
             status: "closed"
           }
-        }, @admin_headers)
+        }, admin_headers)
         expect_successfull_creation('admin')
       end
 
@@ -168,7 +166,7 @@ RSpec.describe "Projects", type: :request do
             description: 'Core (planed)',
             status: "closed"
           }
-        }, @admin_headers)
+        }, admin_headers)
         expect_failed_field('name', "can't be blank")
       end
 
@@ -179,7 +177,7 @@ RSpec.describe "Projects", type: :request do
             description: 'Core (planed)',
             status: "closed"
           }
-        }, @admin_headers)
+        }, admin_headers)
         expect_failed_field('name', "has already been taken")
       end
 
@@ -190,7 +188,7 @@ RSpec.describe "Projects", type: :request do
             description: 'Core (planed)',
             status: "wrong"
           }
-        }, @admin_headers)
+        }, admin_headers)
         expect_failed_field('status', "is not included in the list")
       end
 
@@ -206,7 +204,7 @@ RSpec.describe "Projects", type: :request do
             description: 'Core (planed)',
             status: "closed"
           }
-        }, @user_headers)
+        }, user_headers)
         expect_successfull_creation('john')
       end
 
@@ -252,7 +250,7 @@ RSpec.describe "Projects", type: :request do
             description: 'Core (drop)',
             status: "closed"
           }
-        }, @admin_headers )
+        }, admin_headers )
         expect_successfull_update
       end
 
@@ -263,7 +261,7 @@ RSpec.describe "Projects", type: :request do
             description: 'Core (drop)',
             status: "closed"
           }
-        }, @admin_headers )
+        }, admin_headers )
         expect( response ).to have_http_status(401)
       end
 
@@ -274,7 +272,7 @@ RSpec.describe "Projects", type: :request do
             description: 'Core (drop)',
             status: "closed"
           }
-        }, @admin_headers )
+        }, admin_headers )
         expect_failed_field('name', "has already been taken")
       end
 
@@ -285,7 +283,7 @@ RSpec.describe "Projects", type: :request do
             description: 'Core (drop)',
             status: "closed"
           }
-        }, @admin_headers )
+        }, admin_headers )
         expect_failed_field('name', "can't be blank")
       end
 
@@ -296,7 +294,7 @@ RSpec.describe "Projects", type: :request do
             description: 'Core (planed)',
             status: "wrong"
           }
-        }, @admin_headers)
+        }, admin_headers)
         expect_failed_field('status', "is not included in the list")
       end
 
@@ -311,7 +309,7 @@ RSpec.describe "Projects", type: :request do
             description: 'Core (drop)',
             status: "closed"
           }
-        }, @user_headers )
+        }, user_headers )
         expect_successfull_update
       end
 
@@ -322,7 +320,7 @@ RSpec.describe "Projects", type: :request do
             description: 'Core (drop)',
             status: "closed"
           }
-        }, @user_headers )
+        }, user_headers )
         
         expect( response.status ).to eq(401)
       end
@@ -334,7 +332,7 @@ RSpec.describe "Projects", type: :request do
             description: 'Core (drop)',
             status: "closed"
           }
-        }, @user_headers )
+        }, user_headers )
         expect( response ).to have_http_status(401)
       end
 
@@ -364,13 +362,13 @@ RSpec.describe "Projects", type: :request do
     context "for admin" do
 
       it "destroys an existing project" do
-        delete api_v1_project_path(@user_project), nil, @admin_headers
+        delete api_v1_project_path(@user_project), nil, admin_headers
         expect( response ).to                           have_http_status(200)
         expect( json['status']).to                      eq('success')
       end
 
       it "returns 401 error if project doesn't exist" do
-        delete api_v1_project_path(9999), nil, @admin_headers
+        delete api_v1_project_path(9999), nil, admin_headers
         expect( response ).to                           have_http_status(401)
       end
 
@@ -379,18 +377,18 @@ RSpec.describe "Projects", type: :request do
     context "for user" do
 
       it "destroys an owned project" do
-        delete api_v1_project_path(@user_project), nil, @user_headers
+        delete api_v1_project_path(@user_project), nil, user_headers
         expect( response ).to                           have_http_status(200)
         expect( json['status']).to                      eq('success')
       end
 
       it "returns 401 error for not owned project" do
-        delete api_v1_project_path(@admin_project), nil, @user_headers
+        delete api_v1_project_path(@admin_project), nil, user_headers
         expect( response ).to have_http_status(401)
       end
 
       it "returns 401 error if project doesn't exist" do
-        delete api_v1_project_path(9999), nil, @user_headers
+        delete api_v1_project_path(9999), nil, user_headers
         expect( response ).to have_http_status(401)
       end
 
