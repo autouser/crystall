@@ -2,12 +2,15 @@ require 'rails_helper'
 
 RSpec.describe "Projects", type: :request do
 
+  let(:admin) { create :admin }
+  let(:user)  { create :user }
+
   before(:each) do
 
     Kaminari.config.default_per_page = 5
 
-    @admin = User.create! username: 'admin', password: 'test1234', admin: true
-    @user = User.create! username: 'john', password: 'test1234'
+    # @admin = User.create! username: 'admin', password: 'test1234', admin: true
+    # @user = User.create! username: 'john', password: 'test1234'
 
     @admin_headers = {'HTTP_AUTHORIZATION' => ActionController::HttpAuthentication::Basic.encode_credentials(
       'admin', 'test1234'
@@ -16,8 +19,8 @@ RSpec.describe "Projects", type: :request do
       'john', 'test1234'
     )}
 
-    @admin_project = @admin.projects.create!  name: 'Core 1.0', description: 'Core System', status: 'open'
-    @user_project  = @user.projects.create!   name: 'Core 2.0', description: 'Core System (development)', status: 'closed'
+    @admin_project = admin.projects.create!  name: 'Core 1.0', description: 'Core System', status: 'open'
+    @user_project  = user.projects.create!   name: 'Core 2.0', description: 'Core System (development)', status: 'closed'
 
   end
 
@@ -39,7 +42,7 @@ RSpec.describe "Projects", type: :request do
       expect( json['total_pages']).to     eq(1)
     end
 
-    context "for admin" do
+    context "for admin", focus: true do
 
       it "returns a list of projects" do
         get api_v1_projects_path, nil, @admin_headers
@@ -47,7 +50,7 @@ RSpec.describe "Projects", type: :request do
       end
 
       it "returns only 4 projects if total_projects_count = 9, per_page = 5, page = 2" do
-        (1 .. 7).each {|n| Project.create! user: @admin, name: "project#{n}", status: 'open'}
+        (1 .. 7).each {|n| Project.create! user: admin, name: "project#{n}", status: 'open'}
 
         get api_v1_projects_path, {page: 2}, @admin_headers
         expect( response ).to               have_http_status(200)
@@ -87,7 +90,7 @@ RSpec.describe "Projects", type: :request do
         expect( json['status']).to                eq('success')
         expect( json['project'].keys.count ).to   eq(5)
         expect( json['project']['name'] ).to      eq('Core 1.0')
-        expect( json['project']['owner'] ).to     eq(@admin.username)      
+        expect( json['project']['owner'] ).to     eq(admin.username)      
     end
 
     context "for admin" do
