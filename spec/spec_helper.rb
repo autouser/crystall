@@ -1,3 +1,5 @@
+require 'factory_girl_rails'
+
 require_relative 'support/crystall_helpers'
 require_relative 'support/crystall_expectations'
 
@@ -93,6 +95,7 @@ RSpec.configure do |config|
   Kernel.srand config.seed
 =end
 
+  config.include FactoryGirl::Syntax::Methods
   config.include CrystallHelpers
 
 end
