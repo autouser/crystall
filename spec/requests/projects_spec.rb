@@ -29,7 +29,7 @@ RSpec.describe "Projects", type: :request do
 
   end
 
-  describe "GET /api/projects", focus: false do
+  describe "GET /api/projects" do
 
     def expect_successfull_response
       expect( response ).to               have_http_status(200)
@@ -46,7 +46,7 @@ RSpec.describe "Projects", type: :request do
         expect_successfull_response
       end
 
-      it "returns only 4 projects if total_projects_count = 9, per_page = 5, page = 2", focus: false do
+      it "returns only 4 projects if total_projects_count = 9, per_page = 5, page = 2" do
         (1 .. 7).each {|n| Project.create! user: @admin, name: "project#{n}", status: 'open'}
 
         get api_v1_projects_path, {page: 2}, @admin_headers
@@ -228,7 +228,7 @@ RSpec.describe "Projects", type: :request do
 
 
 
-  describe "PUT /api/project/:id", focus: true do
+  describe "PUT /api/project/:id" do
 
     def expect_successfull_update
       expect( response ).to                           have_http_status(200)
