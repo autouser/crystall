@@ -18,3 +18,16 @@ RSpec::Matchers.define :have_one_error do |field, error|
   end
 
 end
+
+RSpec::Matchers.define :have_field_with_value do |field, value|
+
+  match do |target|
+    target.respond_to?(field) &&
+    target.send(field) == value
+  end
+
+  description do
+    "have field \"#{field}\" with value \"#{value}\""
+  end
+
+end

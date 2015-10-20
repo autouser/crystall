@@ -2,49 +2,33 @@ require 'rails_helper'
 
 RSpec.describe Ticket, type: :model do
 
-  before(:each) do
-    @project_owner  = User.create! username: 'mannie', password: 'test1234'
-    @ticket_owner   = User.create! username: 'john', password: 'test1234'
-    @project        = @project_owner.projects.create! name: 'Core System 1.0', status: 'open'
-  end
+  let(:project_owner) { build :user }
+  let(:ticket_owner)  { project_owner }
+  let(:project)       { build :project, user: project_owner }
 
-  context "is valid" do
-    
-    it "with correct arguments" do
-      ticket = @ticket_owner.tickets.new project: @project, subject: 'Not working', content: 'something'
-      expect( ticket ).to be_valid
+    context "with correct arguments" do
+      let(:ticket) { build :ticket, user: ticket_owner, status: nil }
+
+      it { expect( ticket ).to be_valid }
+      it { ticket.valid? ; expect( ticket ).to have_field_with_value(:status, "open") }
     end
 
-    it "assigns default status" do
-      ticket = @ticket_owner.tickets.create! project: @project, subject: 'Not working', content: 'something'
-      expect( ticket.status ).to eq('open')
+    context "with empty content" do
+      let(:ticket) { build :ticket, user: ticket_owner, content: nil }
+
+      it { expect( ticket ).to have_one_error(:content, "can't be blank") }
     end
 
-  end
+    context "with empty project" do
+      let(:ticket) { build :ticket, user: ticket_owner, project: nil }
 
-  context "is invalid" do
-
-    it "with empty content" do
-      ticket = @ticket_owner.tickets.new project: @project, subject: 'Not working'
-      expect( ticket ).to_not be_valid
-      expect( ticket.errors.size ).to eq(1)
-      expect( ticket.errors.get(:content) ).to match_array(["can't be blank"])
+      it { expect( ticket ).to have_one_error(:project, "can't be blank") }
     end
 
-    it "with empty project" do
-      ticket = @ticket_owner.tickets.new subject: 'Not working', content: 'something'
-      expect( ticket ).to_not be_valid
-      expect( ticket.errors.size ).to eq(1)
-      expect( ticket.errors.get(:project) ).to match_array(["can't be blank"])
-    end
+    context "with empty user" do
+      let(:ticket) { build :ticket, user: nil }
 
-    it "with empty user" do
-      ticket = @project.tickets.new subject: 'Not working', content: 'something'
-      expect( ticket ).to_not be_valid
-      expect( ticket.errors.size ).to eq(1)
-      expect( ticket.errors.get(:user) ).to match_array(["can't be blank"])
+      it { expect( ticket ).to have_one_error(:user, "can't be blank") }
     end
-
-  end
 
 end
