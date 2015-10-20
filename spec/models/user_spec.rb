@@ -2,38 +2,32 @@ require 'rails_helper'
 
 RSpec.describe User, type: :model do
 
-  context "is valid" do
-    it "with correct arguments" do
-      user = User.create username: 'john', password: 'test1234'
-      expect( user ).to be_valid
-      expect( user.username ).to eq('john')
-    end
-  end
-
-  context "is invalid" do
+  describe "when instantiated" do
     
-    it "with empty username" do
-      user = User.new password: 'test1234'
-      expect( user ).to_not be_valid
-      expect( user.errors.size ).to eq(1)
-      expect( user.errors.get(:username) ).to match_array(["can't be blank"])
+    context "with correct arguments" do
+      let(:user) { build :user }
+
+      it { expect( user ).to be_valid }
     end
 
-    it "with non unique username" do
-      user1 = User.create! username: 'john', password: 'test1234'
-      user2 = User.new username: 'john', password: 'test1234'
-      expect( user2 ).to_not be_valid
-      expect( user2.errors.size ).to eq(1)
-      expect( user2.errors.get(:username) ).to match_array("has already been taken")
+    context "with empty username" do
+      let(:user) { build :user, username: nil }
+
+      it { expect( user ).to have_one_error(:username, "can't be blank") }
     end
 
-    it "with empty password" do
-      user = User.new username: 'john'
-      expect( user ).to_not be_valid
-      expect( user.errors.size ).to eq(1)
-      expect( user.errors.get(:password) ).to match_array(["can't be blank"])
+    context "with non unique username" do
+      before(:example) { create :user }
+      let(:user) { build :user }
+
+      it { expect( user ).to have_one_error(:username, "has already been taken") }
     end
 
+    context "with empty password" do
+      let(:user) { build :user, password: nil }
+
+      it { expect( user ).to have_one_error(:password, "can't be blank") }
+    end
   end
 
 end
