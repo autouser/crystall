@@ -31,4 +31,10 @@ RSpec.describe Ticket, type: :model do
       it { expect( ticket ).to have_one_error(:user, "can't be blank") }
     end
 
+    context "with wrong status" do
+      let(:ticket) { build :ticket, user: ticket_owner, status: 'wrong' }
+
+      it { expect( ticket ).to have_one_error(:status, "is not included in the list") }
+    end
+
 end
