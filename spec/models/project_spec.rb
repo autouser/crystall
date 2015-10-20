@@ -2,8 +2,8 @@ require 'rails_helper'
 
 RSpec.describe Project, type: :model do
 
-  let(:user) { User.create! username: 'john', password: 'test1234' }
-
+  # let(:user) { User.create! username: 'john', password: 'test1234' }
+  let(:user) { create :user }
 
   describe "when instantiated", focus: true do
     
