@@ -33,7 +33,7 @@ private
   end
 
   def empty_notfound
-    render nothing: true, status: :unauthorized
+    render nothing: true, status: :not_found
   end
 
   def parameter_missing

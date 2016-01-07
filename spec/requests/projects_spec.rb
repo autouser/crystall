@@ -2,9 +2,6 @@ require 'rails_helper'
 
 RSpec.describe "Projects", type: :request do
 
-  let(:admin) { create :admin }
-  let(:user)  { create :user }
-
   let(:admin_headers) {
     { 'HTTP_AUTHORIZATION' => ActionController::HttpAuthentication::Basic.encode_credentials('admin', 'test1234') }
   }
@@ -13,17 +10,102 @@ RSpec.describe "Projects", type: :request do
     { 'HTTP_AUTHORIZATION' => ActionController::HttpAuthentication::Basic.encode_credentials('john', 'test1234') }
   }
 
-  # let(:admin_project) { create :project, user: admin }
-  # let(:user_project)  { create :project, user: user  }
+  let(:user)                  { create :user  }
+  let(:admin)                 { create :admin }
 
+  let(:user_projects_count)   { 2 }
+  let(:user_projects)         { user_projects_count.times {|n| create :project, name: "User Project #{n+1}", user: user } }
 
+  let(:admin_projects_count)  { 2 }
+  let(:admin_projects)        { admin_projects_count.times {|n| create :project, name: "Admin Project #{n+1}", user: admin } }
 
-  before(:each) do
+  let(:user_project)          { create :project, name: "User Project 1", user: user }
+  let(:admin_project)         { create :project, name: "Admin Project 1", user: admin }
 
-    Kaminari.config.default_per_page = 5
+  def expect_successfull_list_response(args={})
+    args = {page: 1, total_pages: 1, count: 1}.merge args
+    expect( response ).to               have_http_status(200)
+    expect( json['status']).to          eq('success')
+    expect( json['projects'].size).to   eq( args[:count] )
+    expect( json['page']).to            eq( args[:page] )
+    expect( json['total_pages']).to     eq( args[:total_pages] )
+  end
 
-    @admin_project = admin.projects.create!  name: 'Core 1.0', description: 'Core System', status: 'open'
-    @user_project  = user.projects.create!   name: 'Core 2.0', description: 'Core System (development)', status: 'closed'
+  describe "GET /api/projects" do
+
+    RSpec.shared_context "a list response" do |headers|
+
+      context "when there are count of projects less than per_page" do
+        it "returns a list of projects" do
+          user_projects
+          admin_projects
+          get api_v1_projects_path, nil, headers ? send(headers) : nil
+          expect_successfull_list_response count: 4
+        end
+      end
+
+      context "when there are 7 projects and per_page = 5 and page = 2" do
+        let(:user_projects_count) { 7 }
+        it "returns only 2 projects" do
+          Kaminari.config.default_per_page = 5
+          user_projects
+          get api_v1_projects_path, {page: 2}, headers ? send(headers) : nil
+          expect_successfull_list_response count: 2, page: 2, total_pages: 2
+        end
+      end
+
+    end
+
+    context "when user is admin" do
+      it_behaves_like "a list response", :admin_headers
+    end
+
+    context "when user is user" do
+      it_behaves_like "a list response", :user_headers
+    end
+
+    context "when user is guest" do
+      it_behaves_like "a list response"
+    end
+
+  end
+
+  def expect_successfull_entry_response(project)
+    expect( response ).to                     have_http_status(200)
+    expect( json['status']).to                eq('success')
+    expect( json['project'].keys.count ).to   eq(5)
+    expect( json['project']['name'] ).to      eq(project.name)
+    expect( json['project']['owner'] ).to     eq(project.user.username)
+  end
+
+  RSpec.shared_context "an entry response" do |headers|
+    context "when project exists" do
+      it "returns a specific project" do
+        get api_v1_project_path( admin_project ), nil, headers ? send(headers) : nil
+        expect_successfull_entry_response( admin_project )
+      end
+    end
+    context "when project doesn't exist" do
+      it "returns 404 error" do
+        get api_v1_user_path(9999), nil, headers ? send(headers) : nil
+        expect( response ).to have_http_status(404)
+      end
+    end    
+  end
+
+  describe "GET /api/projects/:id" do
+
+    context "when user is admin" do
+      it_behaves_like "an entry response", :admin_headers
+    end
+
+    context "when user is user" do
+      it_behaves_like "an entry response", :user_headers
+    end
+
+    context "when user is guest" do
+      it_behaves_like "an entry response"
+    end
 
   end
 
@@ -32,384 +114,178 @@ RSpec.describe "Projects", type: :request do
     expect( json['status']).to                      eq('failed')
     expect( json['project']['errors'].keys.count ).to  eq(1)
     expect( json['project']['errors'][field] ).to match_array([error])
-
   end
 
-  describe "GET /api/projects" do
-
-    def expect_successfull_response
-      expect( response ).to               have_http_status(200)
-      expect( json['status']).to          eq('success')
-      expect( json['projects'].size).to   eq(2)
-      expect( json['page']).to            eq(1)
-      expect( json['total_pages']).to     eq(1)
-    end
-
-    context "for admin", focus: true do
-
-      it "returns a list of projects" do
-        get api_v1_projects_path, nil, admin_headers
-        expect_successfull_response
-      end
-
-      it "returns only 4 projects if total_projects_count = 9, per_page = 5, page = 2" do
-        (1 .. 7).each {|n| Project.create! user: admin, name: "project#{n}", status: 'open'}
-
-        get api_v1_projects_path, {page: 2}, admin_headers
-        expect( response ).to               have_http_status(200)
-        expect( json['status']).to          eq('success')
-        expect( json['projects'].size).to   eq(4)
-        expect( json['page']).to            eq(2)
-        expect( json['total_pages']).to     eq(2)
-      end
-
-    end
-
-    context "for user" do
-
-      it "returns a list of projects" do
-        get api_v1_projects_path, nil, user_headers
-        expect_successfull_response
-      end      
-
-    end
-
-    context "for guest" do
-
-      it "returns a list of projects" do
-        get api_v1_projects_path
-        expect_successfull_response
-      end      
-
-    end
-
+  def build_params(args={})
+    merged = { name: 'Project 1', description: 'Project Description', status: "closed" }.merge args
+    {project: merged }
   end
 
+  RSpec.shared_context "a create response" do |headers, ns|
+    before(:each) { send(ns) }
 
-  describe "GET /api/projects/:id" do
-
-    def expect_successfull_response
-        expect( response ).to                     have_http_status(200)
-        expect( json['status']).to                eq('success')
-        expect( json['project'].keys.count ).to   eq(5)
-        expect( json['project']['name'] ).to      eq('Core 1.0')
-        expect( json['project']['owner'] ).to     eq(admin.username)      
+    context "when arguments are correct" do
+      it "creates a new project" do
+        post( api_v1_projects_path, build_params,  (headers ? send(headers) : nil))
+        expect_successfull_entry_response( send(ns).projects.find_by(name: 'Project 1') )
+      end
     end
 
-    context "for admin" do
-
-      it "returns a specific project" do
-        get api_v1_project_path(@admin_project), nil, admin_headers
-        expect_successfull_response
+    context "when name is empty" do
+      it "returns an error" do
+        post( api_v1_projects_path, build_params(name: nil), (headers ? send(headers) : nil))
+        expect_failed_field('name', "can't be blank")
       end
-
-      it "returns 401 error if project doesn't exist" do
-        get api_v1_user_path(9999), nil, admin_headers
-        expect( response ).to have_http_status(401)
-      end
-
     end
 
-    context "for user" do
-
-      it "returns a specific project" do
-        get api_v1_project_path(@admin_project), nil, user_headers
-        expect_successfull_response
+    context "when name isn't unique" do
+      it "returns an error" do
+        create :project, name: "Project 1", user: send(ns)
+        post( api_v1_projects_path, build_params, (headers ? send(headers) : nil))
+        expect_failed_field('name', "has already been taken")
       end
-
-      it "returns 401 error if project doesn't exist" do
-        get api_v1_user_path(9999), nil, user_headers
-        expect( response ).to have_http_status(401)
-      end
-
     end
 
-    context "for guest" do
-
-      it "returns a specific project" do
-        get api_v1_project_path(@admin_project)
-        expect_successfull_response
+    context "when status isn't valid" do
+      it "returns an error" do
+        post( api_v1_projects_path, build_params(status: 'wrong'), (headers ? send(headers) : nil))
+        expect_failed_field('status', "is not included in the list")
       end
-
-      it "returns 401 error if project doesn't exist" do
-        get api_v1_user_path(9999)
-        expect( response ).to have_http_status(401)
-      end
-
     end
-
   end
-
 
   describe "POST /api/projects" do
 
-    def expect_successfull_creation(owner)
-      expect( response ).to                         have_http_status(200)
-      expect( json['status']).to                    eq('success')
-      expect( json['project'].keys.count ).to       eq(5)
-      expect( json['project']['name'] ).to          eq('Core 3.0')
-      expect( json['project']['description'] ).to   eq('Core (planed)')
-      expect( json['project']['owner'] ).to         eq(owner)      
+    context "when user is admin" do
+      it_behaves_like "a create response", :admin_headers, :admin
     end
 
-    context "for admin" do
-
-      it "creates a correct new project" do
-        post( api_v1_projects_path, {
-          project: {
-            name: 'Core 3.0',
-            description: 'Core (planed)',
-            status: "closed"
-          }
-        }, admin_headers)
-        expect_successfull_creation('admin')
-      end
-
-      it "returns errors if name is empty" do
-        post( api_v1_projects_path, {
-          project: {
-            description: 'Core (planed)',
-            status: "closed"
-          }
-        }, admin_headers)
-        expect_failed_field('name', "can't be blank")
-      end
-
-      it "returns errors if name isn't unique" do
-        post( api_v1_projects_path, {
-          project: {
-            name: 'Core 2.0',
-            description: 'Core (planed)',
-            status: "closed"
-          }
-        }, admin_headers)
-        expect_failed_field('name', "has already been taken")
-      end
-
-      it "returns errors if status ist valid" do
-        post( api_v1_projects_path, {
-          project: {
-            name: 'Core 3.0',
-            description: 'Core (planed)',
-            status: "wrong"
-          }
-        }, admin_headers)
-        expect_failed_field('status', "is not included in the list")
-      end
-
-
+    context "when user is user" do
+      it_behaves_like "a create response", :user_headers, :user
     end
 
-    context "for user" do
-
-      it "creates a correct new project" do
-        post( api_v1_projects_path, {
-          project: {
-            name: 'Core 3.0',
-            description: 'Core (planed)',
-            status: "closed"
-          }
-        }, user_headers)
-        expect_successfull_creation('john')
-      end
-
-    end
-
-    context "for guest" do
-
-      it "creates a correct new project" do
-        post( api_v1_projects_path, {
-          project: {
-            name: 'Core 3.0',
-            description: 'Core (planed)',
-            status: "closed"
-          }
-        })
+    context "when user is guest" do
+      it "returns 401 error" do
+        post( api_v1_projects_path, build_params)
         expect( response ).to  have_http_status(401)
       end
-
     end
 
   end
-
 
 
   describe "PUT /api/project/:id" do
 
-    def expect_successfull_update
-      expect( response ).to                           have_http_status(200)
-      expect( json['status']).to                      eq('success')
-      expect( json['project'].keys.count ).to         eq(5)
-      expect( json['project']['name'] ).to            eq('Core 2.0 (drop)')
-      expect( json['project']['description'] ).to     eq('Core (drop)')
-      expect( json['project']['status'] ).to          eq('closed')
-      expect( json['project']['owner'] ).to           eq('john')
+    RSpec.shared_context "an update response" do |headers, ns, existing_project|
+      context "when project exists and arguments are correct" do
+        it "updates any existing project" do
+          put( api_v1_project_path(send(existing_project)), build_params(name: 'Project 1.1', description: 'Description 1.1', status: 'open'), (headers ? send(headers) : nil) )
+          expect_successfull_entry_response( send(ns).projects.find_by(name: 'Project 1.1') )
+        end
+      end
+
+      context "when project doesn't exist" do
+        it "returns 404 error" do
+          put( api_v1_project_path(9999), build_params, (headers ? send(headers) : nil) )
+          expect( response ).to have_http_status(404)
+        end
+      end
+
+      context "when name isn't unique" do
+        it "returns an error" do
+          create :project, name: "Project 1.1", user: send(ns)
+          put( api_v1_project_path( send(existing_project) ), build_params(name: 'Project 1.1'), (headers ? send(headers) : nil))
+          expect_failed_field('name', "has already been taken")
+        end
+      end
+
+      context "when name is empty" do
+        it "returns an error" do
+          put( api_v1_project_path( send(existing_project) ), build_params(name: ''), (headers ? send(headers) : nil))
+          expect_failed_field('name', "can't be blank")
+        end
+      end
+
+      context "when status is invalid" do
+        it "returns an error" do
+          put( api_v1_project_path( send(existing_project) ), build_params(status: 'wrong'), (headers ? send(headers) : nil))
+          expect_failed_field('status', "is not included in the list")
+        end
+      end
     end
 
-    context "for admin" do
+    context "when user is admin" do
+      it_behaves_like "an update response", :admin_headers, :admin, :admin_project
 
-      it "updates any existing project" do
-        put( api_v1_project_path(@user_project), {
-          project: {
-            name: 'Core 2.0 (drop)',
-            description: 'Core (drop)',
-            status: "closed"
-          }
-        }, admin_headers )
-        expect_successfull_update
+      context "when a project isn't owned" do
+        it "returns 401 error" do
+          admin_project
+          user_project
+          put( api_v1_project_path( admin_project ), build_params, user_headers )
+          expect( response ).to  have_http_status(401)
+        end        
       end
-
-      it "returns 401 error if project doesn't exist" do
-        put( api_v1_project_path(9999), {
-          project: {
-            name: 'Core 2.0 (drop)',
-            description: 'Core (drop)',
-            status: "closed"
-          }
-        }, admin_headers )
-        expect( response ).to have_http_status(401)
-      end
-
-      it "returns errors if name isn't unique" do
-        put( api_v1_project_path(@user_project), {
-          project: {
-            name: 'Core 1.0',
-            description: 'Core (drop)',
-            status: "closed"
-          }
-        }, admin_headers )
-        expect_failed_field('name', "has already been taken")
-      end
-
-      it "returns errors if name is empty" do
-        put( api_v1_project_path(@user_project), {
-          project: {
-            name: '',
-            description: 'Core (drop)',
-            status: "closed"
-          }
-        }, admin_headers )
-        expect_failed_field('name', "can't be blank")
-      end
-
-      it "returns errors if status is valid" do
-        put( api_v1_project_path(@user_project), {
-          project: {
-            name: 'Core 3.0',
-            description: 'Core (planed)',
-            status: "wrong"
-          }
-        }, admin_headers)
-        expect_failed_field('status', "is not included in the list")
-      end
-
     end
 
-    context "for user" do
+    context "when user is user" do
+      it_behaves_like "an update response", :user_headers, :user, :user_project
 
-      it "updates owned project" do
-        put( api_v1_project_path(@user_project), {
-          project: {
-            name: 'Core 2.0 (drop)',
-            description: 'Core (drop)',
-            status: "closed"
-          }
-        }, user_headers )
-        expect_successfull_update
+      context "when a project isn't owned" do
+        it "returns 401 error" do
+          admin_project
+          user_project
+          put( api_v1_project_path( admin_project ), build_params, user_headers )
+          expect( response ).to  have_http_status(401)
+        end        
       end
-
-      it "returns 401 error for not owned project" do
-        put( api_v1_project_path(@admin_project), {
-          project: {
-            name: 'Core 2.0 (drop)',
-            description: 'Core (drop)',
-            status: "closed"
-          }
-        }, user_headers )
-        
-        expect( response.status ).to eq(401)
-      end
-
-      it "returns 401 error if project doesn't exist" do
-        put( api_v1_project_path(9999), {
-          project: {
-            name: 'Core 2.0 (drop)',
-            description: 'Core (drop)',
-            status: "closed"
-          }
-        }, user_headers )
-        expect( response ).to have_http_status(401)
-      end
-
     end
 
-
-    context "for guest" do
-
-      it "returns 401 error for any project" do
-        put( api_v1_project_path(@admin_project), {
-          project: {
-            name: 'Core 2.0 (drop)',
-            description: 'Core (drop)',
-            status: "closed"
-          }
-        } )
-        
-        expect( response.status ).to eq(401)
+    context "when user is guest" do
+      it "returns 401 error" do
+        put( api_v1_project_path( user_project ), build_params )
+        expect( response ).to  have_http_status(401)
       end
-
     end
 
   end
+
+
 
   describe "DELETE /api/project/:id" do
 
-    context "for admin" do
-
-      it "destroys an existing project" do
-        delete api_v1_project_path(@user_project), nil, admin_headers
-        expect( response ).to                           have_http_status(200)
-        expect( json['status']).to                      eq('success')
+    RSpec.shared_context "a delete response" do |headers, ns, existing_project|
+      context "when project exists and arguments are correct" do
+        it "destroys an existing project" do
+          delete api_v1_project_path(send(existing_project)), nil, (headers ? send(headers) : nil)
+          expect( response ).to                           have_http_status(200)
+          expect( json['status']).to                      eq('success')
+        end        
       end
 
-      it "returns 401 error if project doesn't exist" do
-        delete api_v1_project_path(9999), nil, admin_headers
-        expect( response ).to                           have_http_status(401)
-      end
-
-    end
-
-    context "for user" do
-
-      it "destroys an owned project" do
-        delete api_v1_project_path(@user_project), nil, user_headers
-        expect( response ).to                           have_http_status(200)
-        expect( json['status']).to                      eq('success')
-      end
-
-      it "returns 401 error for not owned project" do
-        delete api_v1_project_path(@admin_project), nil, user_headers
-        expect( response ).to have_http_status(401)
-      end
-
-      it "returns 401 error if project doesn't exist" do
-        delete api_v1_project_path(9999), nil, user_headers
-        expect( response ).to have_http_status(401)
+      context "when project doesn't exist" do
+        it "returns 404 error if project doesn't exist" do
+          delete api_v1_project_path(9999), nil, (headers ? send(headers) : nil)
+          expect( response ).to                           have_http_status(404)
+        end
       end
 
     end
 
-    context "for guest" do
-
-      it "returns 401 error for any project" do
-        delete api_v1_project_path(@admin_project)
-        expect( response ).to have_http_status(401)
-      end
-
+    context "when user is admin" do
+      it_behaves_like "a delete response", :admin_headers, :admin, :admin_project
     end
 
+    context "when user is user" do
+      it_behaves_like "a delete response", :user_headers, :user, :user_project
+    end
+
+    context "when user is guest" do
+      it "returns 401 error" do
+        delete api_v1_project_path(admin_project)
+        expect( response ).to  have_http_status(401)
+      end
+    end
 
   end
-
 
 end
