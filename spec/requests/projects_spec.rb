@@ -177,7 +177,7 @@ RSpec.describe "Projects", type: :request do
   describe "PUT /api/project/:id" do
 
     RSpec.shared_context "an update response" do |headers, ns, existing_project|
-      context "when project exists and arguments are correct" do
+      context "when project is owned" do
         it "updates any existing project" do
           put( api_v1_project_path(send(existing_project)), build_params(name: 'Project 1.1', description: 'Description 1.1', status: 'open'), (headers ? send(headers) : nil) )
           expect_successfull_entry_response( send(ns).projects.find_by(name: 'Project 1.1') )
@@ -254,8 +254,8 @@ RSpec.describe "Projects", type: :request do
   describe "DELETE /api/project/:id" do
 
     RSpec.shared_context "a delete response" do |headers, ns, existing_project|
-      context "when project exists and arguments are correct" do
-        it "destroys an existing project" do
+      context "when project is owned" do
+        it "destroys it" do
           delete api_v1_project_path(send(existing_project)), nil, (headers ? send(headers) : nil)
           expect( response ).to                           have_http_status(200)
           expect( json['status']).to                      eq('success')
@@ -263,7 +263,7 @@ RSpec.describe "Projects", type: :request do
       end
 
       context "when project doesn't exist" do
-        it "returns 404 error if project doesn't exist" do
+        it "returns 404 error" do
           delete api_v1_project_path(9999), nil, (headers ? send(headers) : nil)
           expect( response ).to                           have_http_status(404)
         end
