@@ -2,26 +2,114 @@ require 'rails_helper'
 
 RSpec.describe "Tickets", type: :request do
 
-  before(:each) do
-    Kaminari.config.default_per_page = 5
+  let(:admin_headers) {
+    { 'HTTP_AUTHORIZATION' => ActionController::HttpAuthentication::Basic.encode_credentials('admin', 'test1234') }
+  }
 
-    @admin = User.create! username: 'admin', password: 'test1234', admin: true
-    @user = User.create! username: 'john', password: 'test1234'
+  let(:user_headers) {
+    { 'HTTP_AUTHORIZATION' => ActionController::HttpAuthentication::Basic.encode_credentials('john', 'test1234') }
+  }
 
-    @admin_headers = {'HTTP_AUTHORIZATION' => ActionController::HttpAuthentication::Basic.encode_credentials(
-      'admin', 'test1234'
-    )}
-    @user_headers = {'HTTP_AUTHORIZATION' => ActionController::HttpAuthentication::Basic.encode_credentials(
-      'john', 'test1234'
-    )}
+  let(:user)                  { create :user  }
+  let(:admin)                 { create :admin }
 
-    @admin_project = @admin.projects.create!  name: 'Core 1.0', description: 'Core System', status: 'open'
-    @user_project  = @user.projects.create!   name: 'Core 2.0', description: 'Core System (development)', status: 'closed'
+  let(:user_project)          { create :project, name: "User Project 1", user: user }
+  let(:admin_project)         { create :project, name: "Admin Project 1", user: admin }
 
-    @ticket1 = @admin_project.tickets.create! user: @admin, subject: 'broken', content: 'completely'
-    @ticket2 = @admin_project.tickets.create! user: @user,  subject: 'still broken', content: 'completely'
-    @ticket3 = @user_project.tickets.create!  user: @user,  subject: 'broken', content: 'completely'
+  let(:user_ticket)           { create :ticket, project: user_project, user: user }
+  let(:admin_ticket)          { create :ticket, project: admin_project, user: admin }
 
+  let(:user_tickets_count)    { 2 }
+  let(:user_tickets)          { user_tickets_count.times {|n| create :ticket, subject: "User Ticket #{n+1}", user: user, project: user_project } }
+
+  let(:admin_tickets_count)    { 2 }
+  let(:admin_tickets)          { admin_tickets_count.times {|n| create :ticket, subject: "Admin Ticket #{n+1}", user: admin, project: admin_project } }
+
+  def expect_successfull_list_response(args={})
+    args = {page: 1, total_pages: 1, count: 1}.merge args
+    expect( response ).to               have_http_status(200)
+    expect( json['status']).to          eq('success')
+    expect( json['tickets'].size).to   eq( args[:count] )
+    expect( json['page']).to            eq( args[:page] )
+    expect( json['total_pages']).to     eq( args[:total_pages] )
+  end
+
+  describe "GET /api/project/:project_id/tickets" do
+
+    RSpec.shared_context "a tickets list response" do |headers|
+      context "when there are count of tickets less than per_page" do
+        it "returns a list of tickets" do
+          user_ticket
+          get api_v1_project_tickets_path(user_project), nil, headers ? send(headers) : nil
+          expect_successfull_list_response
+        end
+      end
+
+      context "when there are 7 tikets and per_page = 5 and page = 2" do
+        let(:user_tickets_count) { 7 }
+        it "returns only 2 projects" do
+          Kaminari.config.default_per_page = 5
+          user_tickets
+          get api_v1_project_tickets_path(user_project), {page: 2}, headers ? send(headers) : nil
+          expect_successfull_list_response count: 2, page: 2, total_pages: 2
+        end
+      end
+
+    end
+
+    context "when user is admin" do
+      it_behaves_like "a tickets list response", :admin_headers
+    end
+
+    context "when user is user" do
+      it_behaves_like "a tickets list response", :user_headers
+    end
+
+    context "when user is guest" do
+      it_behaves_like "a tickets list response"
+    end
+
+  end
+
+  def expect_successfull_entry_response(ticket)
+    expect( response ).to                           have_http_status(200)
+    expect( json['status']).to                      eq('success')
+    expect( json['ticket'].keys.count ).to          eq(6)
+    expect( json['ticket']['subject'] ).to          eq(ticket.subject)
+    expect( json['ticket']['content'] ).to          eq(ticket.content)
+    expect( json['ticket']['status'] ).to           eq(ticket.status)
+    expect( json['ticket']['owner'] ).to            eq(ticket.user.username)
+    expect( json['ticket']['project']['id'] ).to    eq(ticket.project_id)
+    expect( json['ticket']['project']['name'] ).to  eq(ticket.project.name)
+  end
+
+  RSpec.shared_context "an ticket entry response" do |headers|
+    context "when ticket exists" do
+      it "returns a specific ticket" do
+        get api_v1_project_ticket_path( admin_project, admin_ticket ), nil, headers ? send(headers) : nil
+        expect_successfull_entry_response( admin_ticket )
+      end
+    end
+    context "when project doesn't exist" do
+      it "returns 404 error" do
+        get api_v1_project_ticket_path( admin_project, 9999 ), nil, headers ? send(headers) : nil
+        expect( response ).to have_http_status(404)
+      end
+    end    
+  end
+
+  describe "GET /api/project/:project_id/tickets/:id" do
+    context "when user is admin" do
+      it_behaves_like "an ticket entry response", :admin_headers
+    end
+
+    context "when user is user" do
+      it_behaves_like "an ticket entry response", :user_headers
+    end
+
+    context "when user is guest" do
+      it_behaves_like "an ticket entry response"
+    end
   end
 
   def expect_failed_field(field, error)
@@ -31,403 +119,227 @@ RSpec.describe "Tickets", type: :request do
     expect( json['ticket']['errors'][field] ).to match_array([error])
   end
 
+  def build_params(args={})
+    merged = { subject: 'Ticket 1', content: 'Ticket Content', status: "open" }.merge args
+    {ticket: merged }
+  end
 
-  describe "GET /api/tickets", focus: false do
+  RSpec.shared_context "a create ticket response" do |headers, ns|
+    before(:each) { admin_project; user }
 
-    def expect_successfull_response
-      expect( response ).to               have_http_status(200)
-      expect( json['status']).to          eq('success')
-      expect( json['tickets'].size).to    eq(2)
-      expect( json['page']).to            eq(1)
-      expect( json['total_pages']).to     eq(1)
+    context "when arguments are correct" do
+      it "creates a new ticket" do
+        post( api_v1_project_tickets_path(admin_project), build_params,  (headers ? send(headers) : nil))
+        expect_successfull_entry_response( send(ns).tickets.find_by(subject: 'Ticket 1') )
+      end
     end
 
-    context "for admin" do
-      it "returns a list of tickets" do
-        get api_v1_project_tickets_path(@admin_project), nil, @admin_headers
-        expect_successfull_response
+    context "when project is owned and closed" do
+      it "creates a new ticket" do
+        owned_project = send("#{ns}_project")
+        owned_project.update(status: 'closed')
+        post( api_v1_project_tickets_path( owned_project ), build_params,  (headers ? send(headers) : nil))
+        expect_successfull_entry_response( send(ns).tickets.find_by(subject: 'Ticket 1') )
       end
-
-      it "returns only 4 tickets if total_tickets_count = 9, per_page = 5, page = 2", focus: false do
-        (1 .. 7).each {|n| @admin_project.tickets.create! user: @admin, content: "ticket#{n}", status: 'open'}
-
-        get api_v1_project_tickets_path(@admin_project), {page: 2}, @admin_headers
-      expect( response ).to               have_http_status(200)
-      expect( json['status']).to          eq('success')
-      expect( json['tickets'].size).to    eq(4)
-      expect( json['page']).to            eq(2)
-      expect( json['total_pages']).to     eq(2)
-      end
-
-
     end
 
-    context "for user" do
-      it "returns a list of tickets" do
-        get api_v1_project_tickets_path(@admin_project), nil, @user_headers
-        expect_successfull_response
+    context "when project is owned and closed" do
+      it "creates a new ticket" do
+        owned_project = send("#{ns}_project")
+        owned_project.update(status: 'closed')
+        post( api_v1_project_tickets_path( owned_project ), build_params,  (headers ? send(headers) : nil))
+        expect_successfull_entry_response( send(ns).tickets.find_by(subject: 'Ticket 1') )
+      end
+    end
+
+    context "when project isn't owned and closed" do
+      it "returns an error" do
+        notowned_project = ns == :admin ? user_project : admin_project
+        notowned_project.update(status: 'closed')
+        post( api_v1_project_tickets_path( notowned_project ), build_params,  (headers ? send(headers) : nil))
+        expect_failed_field('project', "is closed")
+      end
+    end
+
+    context "when content is empty" do
+      it "returns an error" do
+        post( api_v1_project_tickets_path(admin_project), build_params(content: nil), (headers ? send(headers) : nil))
+        expect_failed_field('content', "can't be blank")
+      end
+    end
+
+    context "when status isn't valid" do
+      it "returns an error" do
+        post( api_v1_project_tickets_path(admin_project), build_params(status: 'wrong'), (headers ? send(headers) : nil))
+        expect_failed_field('status', "is not included in the list")
+      end
+    end
+  end
+
+  describe "POST /api/project/:project_id/tickets" do
+    context "when user is admin" do
+      it_behaves_like "a create ticket response", :admin_headers, :admin
+    end
+
+    context "when user is user" do
+      it_behaves_like "a create ticket response", :user_headers, :user
+    end
+
+    context "when user is guest" do
+      it "returns 401 error" do
+        post( api_v1_project_tickets_path(admin_project), build_params)
+        expect( response ).to  have_http_status(401)
+      end
+    end
+  end
+
+  RSpec.shared_context "an update ticket response" do |headers, ns, existing_project, existing_ticket|
+    context "when ticket is owned" do
+      it "updates a ticket" do
+        put(
+          api_v1_project_ticket_path(send(existing_project), send(existing_ticket)),
+          build_params(subject: 'Ticket 1.1', content: 'Ticket Content 1.1', status: 'closed'),
+          (headers ? send(headers) : nil)
+        )
+        expect_successfull_entry_response( send(ns).tickets.find_by(subject: 'Ticket 1.1') )
+      end
+    end
+
+    context "when ticket doesn't exist" do
+      it "returns 404 error" do
+        put(
+          api_v1_project_ticket_path(send(existing_project), 9999),
+          build_params(subject: 'Ticket 1.1', content: 'Ticket Content 1.1', status: 'closed'),
+          (headers ? send(headers) : nil)
+        )
+        expect( response ).to  have_http_status(404)
+      end
+    end
+
+    context "when content is empty" do
+      it "returns an error" do
+        put(
+          api_v1_project_ticket_path(send(existing_project), send(existing_ticket)),
+          build_params(subject: 'Ticket 1.1', content: '', status: 'closed'),
+          (headers ? send(headers) : nil)
+        )
+        expect_failed_field('content', "can't be blank")
+      end
+    end
+
+    context "when status isn't valid" do
+      it "returns an error" do
+        put(
+          api_v1_project_ticket_path(send(existing_project), send(existing_ticket)),
+          build_params(subject: 'Ticket 1.1', content: 'Ticket Content 1.1', status: 'wrong'),
+          (headers ? send(headers) : nil)
+        )
+        expect_failed_field('status', "is not included in the list")
       end
     end
 
   end
 
+  describe "PUT /api/project/:project_id/tickets" do
+    context "when user is admin" do
+      it_behaves_like "an update ticket response", :admin_headers, :admin, :admin_project, :admin_ticket
 
-  describe "GET /api/tickets/:id" do
+      context "when ticket isn't owned" do
+        it "updates a ticket" do
+          admin
+          put(
+            api_v1_project_ticket_path(user_project, user_ticket),
+            build_params(subject: 'Ticket 1.1', content: 'Ticket Content 1.1', status: 'closed'),
+            admin_headers
+          )
+          expect_successfull_entry_response( user.tickets.find_by(subject: 'Ticket 1.1') )
+        end
+      end
+    end
 
-    def expect_successfull_response
+    context "when user is user" do
+      it_behaves_like "an update ticket response", :user_headers, :user, :user_project, :user_ticket
+
+      context "when ticket isn't owned" do
+        it "returns 401 error" do
+          user
+          put(
+            api_v1_project_ticket_path(admin_project, admin_ticket),
+            build_params(subject: 'Ticket 1.1', content: 'Ticket Content 1.1', status: 'closed'),
+            user_headers
+          )
+          expect( response ).to  have_http_status(401)
+        end
+      end
+    end
+
+    context "when user is guest" do
+      it "returns 401 error" do
+        put( api_v1_project_ticket_path( admin_project, admin_ticket ), build_params )
+        expect( response ).to  have_http_status(401)
+      end
+    end
+  end
+
+  RSpec.shared_context "a delete ticket response" do |headers, ns, existing_project, existing_ticket|
+    context "when project is owned" do
+      it "destroys it" do
+        delete api_v1_project_ticket_path(send(existing_project), send(existing_ticket)),nil, (headers ? send(headers) : nil)
         expect( response ).to                           have_http_status(200)
         expect( json['status']).to                      eq('success')
-        expect( json['ticket'].keys.count ).to          eq(6)
-        expect( json['ticket']['subject'] ).to          eq('broken')
-        expect( json['ticket']['content'] ).to          eq('completely')
-        expect( json['ticket']['status'] ).to           eq('open')
-        expect( json['ticket']['owner'] ).to            eq(@admin.username)  
-        expect( json['ticket']['project']['id'] ).to    eq(@admin_project.id)
-        expect( json['ticket']['project']['name'] ).to  eq(@admin_project.name)
+      end        
     end
 
-    context "for admin" do
-
-      it "returns a specific ticket" do
-        get api_v1_project_ticket_path(@admin_project, @ticket1), nil, @admin_headers
-        expect_successfull_response
+    context "when project doesn't exist" do
+      it "returns 404 error" do
+        delete api_v1_project_ticket_path(send(existing_project), 9999),nil, (headers ? send(headers) : nil)
+        expect( response ).to                           have_http_status(404)
       end
-
-      it "returns 401 error if tickey doesn't exist" do
-        get api_v1_project_ticket_path(@admin_project, 9999), nil, @admin_headers
-        expect( response ).to have_http_status(401)
-      end
-
-    end
-
-    context "for user" do
-
-      it "returns a specific ticket" do
-        get api_v1_project_ticket_path(@admin_project, @ticket1), nil, @user_headers
-        expect_successfull_response
-      end
-
-      it "returns 401 error if ticket doesn't exist" do
-        get api_v1_project_ticket_path(@admin_project, 9999), nil, @user_headers
-        expect( response ).to have_http_status(401)
-      end
-
-    end
-
-    context "for guest" do
-
-      it "returns a specific ticket" do
-        get api_v1_project_ticket_path(@admin_project, @ticket1)
-        expect_successfull_response
-      end
-
-      it "returns 401 error if ticket doesn't exist" do
-        get api_v1_project_ticket_path(@admin_project, 9999)
-        expect( response ).to have_http_status(401)
-      end
-
     end
 
   end
 
 
-  describe "POST /api/tickets" do
+  fdescribe "DELETE /api/project/:project_id/tickets/:id" do
+    context "when user is admin" do
+      it_behaves_like "a delete ticket response", :admin_headers, :admin, :admin_project, :admin_ticket
 
-    def expect_successfull_creation(project, owner)
-      expect( response ).to                         have_http_status(200)
-      expect( json['status']).to                      eq('success')
-      expect( json['ticket'].keys.count ).to          eq(6)
-      expect( json['ticket']['subject'] ).to          eq('broken too much')
-      expect( json['ticket']['content'] ).to          eq('completely...')
-      expect( json['ticket']['status'] ).to           eq('closed')
-      expect( json['ticket']['owner'] ).to            eq(owner.username)  
-      expect( json['ticket']['project']['id'] ).to    eq(project.id)
-      expect( json['ticket']['project']['name'] ).to  eq(project.name)
+      context "when ticket isn't owned" do
+        it "updates a ticket" do
+          admin
+          delete(
+            api_v1_project_ticket_path(user_project, user_ticket),
+            build_params(subject: 'Ticket 1.1', content: 'Ticket Content 1.1', status: 'closed'),
+            admin_headers
+          )
+          expect( response ).to                           have_http_status(200)
+          expect( json['status']).to                      eq('success')
+        end
+      end
     end
 
-    context "for admin" do
+    context "when user is user" do
+      it_behaves_like "a delete ticket response", :user_headers, :user, :user_project, :user_ticket
 
-      it "creates a correct new ticket" do
-        post( api_v1_project_tickets_path(@admin_project), {
-          ticket: {
-            subject:  'broken too much',
-            content:  'completely...',
-            status:   'closed'
-          }
-        }, @admin_headers)
-        expect_successfull_creation(@admin_project,@admin)
+      context "when ticket isn't owned" do
+        it "returns 401 error" do
+          user
+          delete(
+            api_v1_project_ticket_path(admin_project, admin_ticket),
+            build_params(subject: 'Ticket 1.1', content: 'Ticket Content 1.1', status: 'closed'),
+            user_headers
+          )
+          expect( response ).to   have_http_status(401)
+        end
       end
-
-      it "returns errors if name is empty" do
-        post( api_v1_project_tickets_path(@admin_project), {
-          ticket: {
-            subject:  'broken too much',
-            status:   'closed'
-          }
-        }, @admin_headers)
-        expect_failed_field('content', "can't be blank")
-      end
-
-      it "returns errors if status is wrong" do
-        post( api_v1_project_tickets_path(@admin_project), {
-          ticket: {
-            subject:  'broken too much',
-            content:  'completely...',
-            status:   'wrong'
-          }
-        }, @admin_headers)
-        expect_failed_field('status', "is not included in the list")
-      end
-
     end
 
-    context "for user" do
-
-      it "creates a correct new ticket" do
-        post( api_v1_project_tickets_path(@user_project), {
-          ticket: {
-            subject:  'broken too much',
-            content:  'completely...',
-            status:   'closed'
-          }
-        }, @user_headers)
-        expect_successfull_creation(@user_project, @user)
-      end
-
-      it "creates a correct new ticket if project is owned and closed" do
-        @user_project.update status: 'closed'
-        post( api_v1_project_tickets_path(@user_project), {
-          ticket: {
-            subject:  'broken too much',
-            content:  'completely...',
-            status:   'closed'
-          }
-        }, @user_headers)
-        expect_successfull_creation(@user_project, @user)
-      end
-
-      it "returns errors if project isn't owned and closed" do
-        @admin_project.update status: 'closed'
-        post( api_v1_project_tickets_path(@admin_project), {
-          ticket: {
-            subject:  'broken too much',
-            content:  'completely...',
-            status:   'closed'
-          }
-        }, @user_headers)
-        expect_failed_field('project', "is closed")
-      end
-
-
-      it "returns errors if content is empty" do
-        post( api_v1_project_tickets_path(@admin_project), {
-          ticket: {
-            subject:  'broken too much',
-            status:   'closed'
-          }
-        }, @user_headers)
-        expect_failed_field('content', "can't be blank")
-      end
-
-      it "returns errors if status is wrong" do
-        post( api_v1_project_tickets_path(@admin_project), {
-          ticket: {
-            subject:  'broken too much',
-            content:  'completely...',
-            status:   'wrong'
-          }
-        }, @user_headers)
-        expect_failed_field('status', "is not included in the list")
-      end
-
-    end
-
-    context "for guest" do
-
+    context "when user is guest" do
       it "returns 401 error" do
-        post( api_v1_project_tickets_path(@user_project), {
-          ticket: {
-            subject:  'broken too much',
-            content:  'completely...',
-            status:   'closed'
-          }
-        })
-        expect( response ).to have_http_status(401)
-      end
-
-    end
-
-  end
-
-  describe "PUT /api/tickets" do
-
-    def expect_successfull_update(project, owner)
-      expect( response ).to                         have_http_status(200)
-      expect( json['status']).to                      eq('success')
-      expect( json['ticket'].keys.count ).to          eq(6)
-      expect( json['ticket']['subject'] ).to          eq('broken too much')
-      expect( json['ticket']['content'] ).to          eq('completely...')
-      expect( json['ticket']['status'] ).to           eq('closed')
-      expect( json['ticket']['owner'] ).to            eq(owner.username)  
-      expect( json['ticket']['project']['id'] ).to    eq(project.id)
-      expect( json['ticket']['project']['name'] ).to  eq(project.name)
-    end
-
-    context "for admin" do
-
-      it "updates any existing ticket" do
-        put( api_v1_project_ticket_path(@admin_project, @ticket2), {
-          ticket: {
-            subject:  'broken too much',
-            content:  'completely...',
-            status:   'closed'
-          }
-        }, @admin_headers)
-        expect_successfull_update(@admin_project,@user)
-      end
-
-      it "returns errors if status is wrong" do
-        put( api_v1_project_ticket_path(@admin_project, @ticket2), {
-          ticket: {
-            subject:  'broken too much',
-            content:  'completely...',
-            status:   'wrong'
-          }
-        }, @admin_headers)
-        expect_failed_field('status', "is not included in the list")
-      end
-
-      it "returns 401 error if ticket doesn't exist" do
-        put( api_v1_project_ticket_path(@admin_project, 9999), {
-          ticket: {
-            subject:  'broken too much',
-            content:  'completely...',
-            status:   'closed'
-          }
-        }, @admin_headers)
-        expect( response ).to have_http_status(401)
-      end
-
-    end
-
-    context "for user" do
-
-      it "updates an owned ticket" do
-        put( api_v1_project_ticket_path(@admin_project, @ticket2), {
-          ticket: {
-            subject:  'broken too much',
-            content:  'completely...',
-            status:   'closed'
-          }
-        }, @user_headers)
-        expect_successfull_update(@admin_project,@user)
-      end
-
-      it "updates owned ticket if project is owned and closed" do
-        put( api_v1_project_ticket_path(@user_project, @ticket3), {
-          ticket: {
-            subject:  'broken too much',
-            content:  'completely...',
-            status:   'closed'
-          }
-        }, @user_headers)
-        expect_successfull_update(@user_project,@user)
-      end
-
-      it "returns errors if project isn't owned and closed" do
-        @admin_project.update status: 'closed'
-        put( api_v1_project_ticket_path(@admin_project, @ticket2), {
-          ticket: {
-            subject:  'broken too much',
-            content:  'completely...',
-            status:   'closed'
-          }
-        }, @user_headers)
-        expect_failed_field('project', "is closed")
-      end
-
-      it "returns 401 error if ticket isn't owned" do
-        @admin_project.update status: 'closed'
-        put( api_v1_project_ticket_path(@admin_project, @ticket1), {
-          ticket: {
-            subject:  'broken too much',
-            content:  'completely...',
-            status:   'closed'
-          }
-        }, @user_headers)
-        expect( response ).to have_http_status(401)
-      end
-
-      it "returns 401 error if ticket doesn't exist" do
-        put( api_v1_project_ticket_path(@user_project, 9999), {
-          ticket: {
-            subject:  'broken too much',
-            content:  'completely...',
-            status:   'closed'
-          }
-        }, @user_headers)
-        expect( response ).to have_http_status(401)
-      end
-
-    end
-
-    context "for guest" do
-      it "returns 401 error if ticket doesn't exist" do
-        put( api_v1_project_ticket_path(@admin_project, @ticket2), {
-          ticket: {
-            subject:  'broken too much',
-            content:  'completely...',
-            status:   'closed'
-          }
-        })
-        expect( response ).to have_http_status(401)
-      end      
-    end
-
-  end
-
-  describe "DELETE /api/project/:id" do
-
-    context "for admin" do
-
-      it "deletes any ticket" do
-        delete api_v1_project_ticket_path(@admin_project, @ticket2), nil, @admin_headers     
-        expect( response ).to have_http_status(200)
-      end
-
-      it "returns 401 error if user doesn't exist" do
-        delete api_v1_project_ticket_path(@admin_project, 9999), nil, @admin_headers     
-        expect( response ).to have_http_status(401)
-      end
-
-    end
-
-    context "for user" do
-
-      it "deletes an owned ticket" do
-        delete api_v1_project_ticket_path(@admin_project, @ticket2), nil, @user_headers     
-        expect( response ).to have_http_status(200)
-      end
-
-      it "returns 401 for not owned ticket" do
-        delete api_v1_project_ticket_path(@admin_project, @ticket1), nil, @user_headers     
-        expect( response ).to have_http_status(401)
-      end
-
-      it "returns 401 if user doesn't exist" do
-        delete api_v1_project_ticket_path(@admin_project, 9999), nil, @user_headers     
-        expect( response ).to have_http_status(401)
-      end
-
-    end
-
-    context "for guest" do
-      it "returns 401" do
-        delete api_v1_project_ticket_path(@admin_project, @ticket1)
-        expect( response ).to have_http_status(401)
+        delete api_v1_project_ticket_path(admin_project, admin_ticket)
+        expect( response ).to  have_http_status(401)
       end
     end
-
   end
 
 end

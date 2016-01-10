@@ -33,7 +33,7 @@ RSpec.describe "Projects", type: :request do
 
   describe "GET /api/projects" do
 
-    RSpec.shared_context "a list response" do |headers|
+    RSpec.shared_context "a projects list response" do |headers|
 
       context "when there are count of projects less than per_page" do
         it "returns a list of projects" do
@@ -57,15 +57,15 @@ RSpec.describe "Projects", type: :request do
     end
 
     context "when user is admin" do
-      it_behaves_like "a list response", :admin_headers
+      it_behaves_like "a projects list response", :admin_headers
     end
 
     context "when user is user" do
-      it_behaves_like "a list response", :user_headers
+      it_behaves_like "a projects list response", :user_headers
     end
 
     context "when user is guest" do
-      it_behaves_like "a list response"
+      it_behaves_like "a projects list response"
     end
 
   end
@@ -78,7 +78,7 @@ RSpec.describe "Projects", type: :request do
     expect( json['project']['owner'] ).to     eq(project.user.username)
   end
 
-  RSpec.shared_context "an entry response" do |headers|
+  RSpec.shared_context "a project entry response" do |headers|
     context "when project exists" do
       it "returns a specific project" do
         get api_v1_project_path( admin_project ), nil, headers ? send(headers) : nil
@@ -87,7 +87,7 @@ RSpec.describe "Projects", type: :request do
     end
     context "when project doesn't exist" do
       it "returns 404 error" do
-        get api_v1_user_path(9999), nil, headers ? send(headers) : nil
+        get api_v1_project_path(9999), nil, headers ? send(headers) : nil
         expect( response ).to have_http_status(404)
       end
     end    
@@ -96,15 +96,15 @@ RSpec.describe "Projects", type: :request do
   describe "GET /api/projects/:id" do
 
     context "when user is admin" do
-      it_behaves_like "an entry response", :admin_headers
+      it_behaves_like "a project entry response", :admin_headers
     end
 
     context "when user is user" do
-      it_behaves_like "an entry response", :user_headers
+      it_behaves_like "a project entry response", :user_headers
     end
 
     context "when user is guest" do
-      it_behaves_like "an entry response"
+      it_behaves_like "a project entry response"
     end
 
   end
@@ -121,7 +121,7 @@ RSpec.describe "Projects", type: :request do
     {project: merged }
   end
 
-  RSpec.shared_context "a create response" do |headers, ns|
+  RSpec.shared_context "a create project response" do |headers, ns|
     before(:each) { send(ns) }
 
     context "when arguments are correct" do
@@ -157,11 +157,11 @@ RSpec.describe "Projects", type: :request do
   describe "POST /api/projects" do
 
     context "when user is admin" do
-      it_behaves_like "a create response", :admin_headers, :admin
+      it_behaves_like "a create project response", :admin_headers, :admin
     end
 
     context "when user is user" do
-      it_behaves_like "a create response", :user_headers, :user
+      it_behaves_like "a create project response", :user_headers, :user
     end
 
     context "when user is guest" do
@@ -176,7 +176,7 @@ RSpec.describe "Projects", type: :request do
 
   describe "PUT /api/project/:id" do
 
-    RSpec.shared_context "an update response" do |headers, ns, existing_project|
+    RSpec.shared_context "an update project response" do |headers, ns, existing_project|
       context "when project is owned" do
         it "updates any existing project" do
           put( api_v1_project_path(send(existing_project)), build_params(name: 'Project 1.1', description: 'Description 1.1', status: 'open'), (headers ? send(headers) : nil) )
@@ -215,7 +215,7 @@ RSpec.describe "Projects", type: :request do
     end
 
     context "when user is admin" do
-      it_behaves_like "an update response", :admin_headers, :admin, :admin_project
+      it_behaves_like "an update project response", :admin_headers, :admin, :admin_project
 
       context "when a project isn't owned" do
         it "returns 401 error" do
@@ -228,7 +228,7 @@ RSpec.describe "Projects", type: :request do
     end
 
     context "when user is user" do
-      it_behaves_like "an update response", :user_headers, :user, :user_project
+      it_behaves_like "an update project response", :user_headers, :user, :user_project
 
       context "when a project isn't owned" do
         it "returns 401 error" do
@@ -253,7 +253,7 @@ RSpec.describe "Projects", type: :request do
 
   describe "DELETE /api/project/:id" do
 
-    RSpec.shared_context "a delete response" do |headers, ns, existing_project|
+    RSpec.shared_context "a delete project response" do |headers, ns, existing_project|
       context "when project is owned" do
         it "destroys it" do
           delete api_v1_project_path(send(existing_project)), nil, (headers ? send(headers) : nil)
@@ -272,11 +272,11 @@ RSpec.describe "Projects", type: :request do
     end
 
     context "when user is admin" do
-      it_behaves_like "a delete response", :admin_headers, :admin, :admin_project
+      it_behaves_like "a delete project response", :admin_headers, :admin, :admin_project
     end
 
     context "when user is user" do
-      it_behaves_like "a delete response", :user_headers, :user, :user_project
+      it_behaves_like "a delete project response", :user_headers, :user, :user_project
     end
 
     context "when user is guest" do
