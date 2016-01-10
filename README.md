@@ -67,7 +67,7 @@ You can access *projects* resources:
 # Authentication isn't required. Any admin, user or guest can get a projects list.
 GET /api/v1/projects.json
 
-# Authentication isn required. Returns a list of projects which belongs to user
+# Authentication is required. Returns a list of projects which belongs to user
 GET /api/v1/projects/mine.json
 
 # Get a projects by id.
