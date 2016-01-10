@@ -116,6 +116,29 @@ RSpec.describe "Users", type: :request do
 
   end
 
+
+  describe "POST /api/users/me" do
+    context "when user is authenticated" do
+      it "returns username and id" do
+        user
+        get me_api_v1_users_path, nil, user_headers
+        expect( response ).to                     have_http_status(200)
+        expect( json['status']).to                eq('success')
+        expect( json['user']['username'] ).to     eq(user.username)
+        expect( json['user']['id'] ).to           eq(user.id)
+      end
+    end
+
+    context "when user isn't authenticated" do
+      it "returns 401 error" do
+        user
+        get me_api_v1_users_path
+        expect( response ).to                     have_http_status(401)
+      end
+    end
+  end
+
+
   def expect_failed_field(field, error)
     expect( response ).to                           have_http_status(400)
     expect( json['status']).to                      eq('failed')
@@ -265,7 +288,7 @@ RSpec.describe "Users", type: :request do
     end
   end
 
-  fdescribe "DELETE /api/users/:id" do
+  describe "DELETE /api/users/:id" do
     context "when user is admin" do
       it_behaves_like "a delete response", :admin_headers, :admin
 

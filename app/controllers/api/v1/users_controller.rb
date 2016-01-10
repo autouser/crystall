@@ -18,6 +18,14 @@ class Api::V1::UsersController < Api::V1::BaseController
     @user.destroy
   end
 
+  def me
+    if current_user.present?
+      @user = current_user
+    else
+      render status: 401
+    end
+  end
+
 private
 
   def user_params

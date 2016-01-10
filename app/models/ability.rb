@@ -9,6 +9,7 @@ class Ability
     elsif !user.new_record?
       can [:show, :update, :destroy], User, id: user.id
       can :create, User
+      can :me, User
 
       can [:index, :show, :create], Project
       can [:update, :destroy],      Project, user_id: user.id
