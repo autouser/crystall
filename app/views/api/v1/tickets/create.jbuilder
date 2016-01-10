@@ -1,4 +1,4 @@
-json.status (@ticket.errors.any? ? 'failed' : 'success')
+json.status @ticket.validation_status
 json.ticket do
   json.owner        @ticket.user.username if @ticket.user
   if @ticket.project

@@ -1,5 +1,7 @@
 class User < ActiveRecord::Base
 
+  include ValidationStatus
+
   has_secure_password
 
   has_many :projects, dependent: :destroy

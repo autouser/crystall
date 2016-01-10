@@ -1,5 +1,7 @@
 class Project < ActiveRecord::Base
 
+  include ValidationStatus
+
   belongs_to :user
   has_many   :tickets, dependent: :destroy
 

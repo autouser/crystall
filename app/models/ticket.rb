@@ -1,17 +1,19 @@
 class Ticket < ActiveRecord::Base
 
+  include ValidationStatus
+
   belongs_to :user
   belongs_to :project
 
   validates :content,   presence: true
 
-  validates :status,  inclusion: {in: ['open', 'closed', 'finished']}
+  validates :status,    inclusion: {in: ['open', 'closed', 'finished']}
 
   validates :project,   presence: true
 
   validates :user,      presence: true
 
-  validate :project_validator
+  validate  :project_validator
 
   before_validation :assign_status
 

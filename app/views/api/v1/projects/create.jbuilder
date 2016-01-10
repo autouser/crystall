@@ -1,4 +1,4 @@
-json.status (@project.errors.any? ? 'failed' : 'success')
+json.status @project.validation_status
 json.project do
   json.id           @project.id if @project.id
   json.owner        @project.user.username if @project.user
