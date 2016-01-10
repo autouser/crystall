@@ -35,6 +35,10 @@ GET /api/v1/users.json
 # Authentication is required. Admin allowed to get any user, user - only himself.
 GET /api/v1/users/1.json 
 
+# Provide user with username and id.
+# Authentication is required.
+GET /api/v1/users/me.json 
+
 # Create a new user.
 # Authentication isn't required. Any admin, user or guest can create a new user.
 POST /api/v1/users.json
@@ -62,6 +66,9 @@ You can access *projects* resources:
 # Get list of projects.
 # Authentication isn't required. Any admin, user or guest can get a projects list.
 GET /api/v1/projects.json
+
+# Authentication isn required. Returns a list of projects which belongs to user
+GET /api/v1/projects/mine.json
 
 # Get a projects by id.
 # Authentication isn't required. Any admin, user or guest can get a project.
