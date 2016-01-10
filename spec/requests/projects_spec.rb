@@ -70,6 +70,29 @@ RSpec.describe "Projects", type: :request do
 
   end
 
+
+  describe "GET /api/projects/mine" do
+
+    let(:user_projects_count)   { 2 }
+    let(:admin_projects_count)  { 3 }
+    context "when user is authenticated" do
+      it "returns a list of user owned projects" do
+        user_projects
+        admin_projects
+        get mine_api_v1_projects_path, nil, user_headers
+        expect_successfull_list_response count: 2
+      end
+    end
+    context "when user isn't authenticated" do
+      it "returns 401 error" do
+        user_projects
+        get mine_api_v1_projects_path
+        expect( response ).to                 have_http_status(401)
+      end
+    end
+  end
+
+
   def expect_successfull_entry_response(project)
     expect( response ).to                     have_http_status(200)
     expect( json['status']).to                eq('success')

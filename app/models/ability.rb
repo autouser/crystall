@@ -13,6 +13,7 @@ class Ability
 
       can [:index, :show, :create], Project
       can [:update, :destroy],      Project, user_id: user.id
+      can :mine, Project
 
       can [:index, :show, :create], Ticket
       can :create,                  Ticket, project: { status: 'open' }

@@ -8,6 +8,7 @@ namespace :api do
       get :me, on: :collection
     end
     resources :projects,  only: [:index, :show, :create, :update, :destroy] do
+      get :mine, on: :collection
       resources :tickets,   only: [:index, :show, :create, :update, :destroy]
     end
     

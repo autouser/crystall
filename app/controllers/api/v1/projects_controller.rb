@@ -19,6 +19,11 @@ class Api::V1::ProjectsController < Api::V1::BaseController
     @project.destroy
   end
 
+  def mine
+    @projects = @projects.includes(:user).where(user_id: current_user.id).page(params[:page])
+    render action: 'index'
+  end
+
 private
 
   def project_params
